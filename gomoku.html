@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>现代五子棋</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .subtitle {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            color: #94a3b8;
+        }
+        .game-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .board-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        canvas {
+            display: block;
+            background: #1c1917;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 180px;
+            justify-content: center;
+        }
+        .status {
+            background: rgba(30, 41, 59, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            margin-bottom: 10px;
+        }
+        .player {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .player.black { color: #0ea5e9; }
+        .player.white { color: #f1f5f9; }
+        .turn-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .black-indicator { background-color: #0ea5e9; box-shadow: 0 0 8px #0ea5e9; }
+        .white-indicator { background-color: #f1f5f9; box-shadow: 0 0 8px #f1f5f9; }
+        .history {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+        button {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+        button:active { transform: translateY(0); }
+        button#restart { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        button#undo { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #475569;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            animation: modalAppear 0.4s ease-out;
+        }
+        @keyframes modalAppear {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .modal h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #22d3ee, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .winner-piece {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 10px;
+            vertical-align: middle;
+            box-shadow: 0 0 15px currentColor;
+        }
+        .black-piece { background: radial-gradient(circle at 30% 30%, #0ea5e9, #0369a1); }
+        .white-piece { background: radial-gradient(circle at 30% 30%, #f8fafc, #cbd5e1); }
+        .modal button {
+            margin-top: 25px;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+        }
+        footer {
+            margin-top: 20px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        @media (max-width: 768px) {
+            .game-area { flex-direction: column; align-items: center; }
+            .controls { width: 100%; max-width: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>五子棋</h1>
+        <p class="subtitle">双人对战 · 先连成五子者胜</p>
+        <div class="game-area">
+            <div class="board-container">
+                <canvas id="boardCanvas" width="600" height="600"></canvas>
+            </div>
+            <div class="controls">
+                <div class="status">
+                    <div class="player black" id="blackPlayer">黑方 <span class="turn-indicator black-indicator"></span></div>
+                    <div class="player white" id="whitePlayer">白方 <span class="turn-indicator white-indicator"></span></div>
+                    <div class="history" id="moveHistory">总步数: 0</div>
+                </div>
+                <button id="undo">悔棋 (Undo)</button>
+                <button id="restart">重新开始</button>
+            </div>
+        </div>
+        <footer>使用 Canvas 绘制 | 现代深色主题</footer>
+    </div>
+
+    <div class="modal" id="winModal">
+        <div class="modal-content">
+            <h2 id="winTitle">游戏结束</h2>
+            <p id="winMessage" style="font-size: 1.2rem; line-height: 1.6; margin-bottom: 10px;"></p>
+            <div id="winPiece"></div>
+            <button id="modalRestart">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('boardCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 15;
+        const cellSize = canvas.width / (gridSize + 1);
+        let board = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+        let currentPlayer = 1;
+        let gameOver = false;
+        let moveHistory = [];
+        const blackPlayerEl = document.getElementById('blackPlayer');
+        const whitePlayerEl = document.getElementById('whitePlayer');
+        const moveHistoryEl = document.getElementById('moveHistory');
+        const undoBtn = document.getElementById('undo');
+        const restartBtn = document.getElementById('restart');
+        const winModal = document.getElementById('winModal');
+        const winTitle = document.getElementById('winTitle');
+        const winMessage = document.getElementById('winMessage');
+        const winPiece = document.getElementById('winPiece');
+        const modalRestartBtn = document.getElementById('modalRestart');
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1c1917';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const woodGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            woodGradient.addColorStop(0, '#8b4513');
+            woodGradient.addColorStop(0.5, '#d2691e');
+            woodGradient.addColorStop(1, '#8b4513');
+            ctx.fillStyle = woodGradient;
+            ctx.fillRect(cellSize/2, cellSize/2, canvas.width - cellSize, canvas.height - cellSize);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < gridSize; i++) {
+                const pos = cellSize * (i + 1);
+                ctx.beginPath();
+                ctx.moveTo(pos, cellSize);
+                ctx.lineTo(pos, canvas.height - cellSize);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cellSize, pos);
+                ctx.lineTo(canvas.width - cellSize, pos);
+                ctx.stroke();
+            }
+            const centerDots = [3, 7, 11];
+            centerDots.forEach(x => {
+                centerDots.forEach(y => {
+                    ctx.beginPath();
+                    ctx.arc(cellSize * (x + 1), cellSize * (y + 1), 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#000';
+                    ctx.fill();
+                });
+            });
+        }
+
+        function drawPiece(x, y, player) {
+            const px = cellSize * (x + 1);
+            const py = cellSize * (y + 1);
+            const radius = cellSize * 0.4;
+            const gradient = ctx.createRadialGradient(px - radius/3, py - radius/3, 1, px, py, radius);
+            if (player === 1) {
+                gradient.addColorStop(0, '#0ea5e9');
+                gradient.addColorStop(1, '#0369a1');
+            } else {
+                gradient.addColorStop(0, '#f8fafc');
+                gradient.addColorStop(1, '#cbd5e1');
+            }
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.shadowColor = player === 1 ? 'rgba(14, 165, 233, 0.7)' : 'rgba(248, 250, 252, 0.7)';
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawAllPieces() {
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    if (board[y][x] !== 0) {
+                        drawPiece(x, y, board[y][x]);
+                    }
+                }
+            }
+        }
+
+        function updateStatus() {
+            blackPlayerEl.innerHTML = `黑方 ${currentPlayer === 1 ? '<span class="turn-indicator black-indicator"></span>' : ''}`;
+            whitePlayerEl.innerHTML = `白方 ${currentPlayer === 2 ? '<span class="turn-indicator white-indicator"></span>' : ''}`;
+            moveHistoryEl.textContent = `总步数: ${moveHistory.length}`;
+        }
+
+        function checkWin(x, y, player) {
+            const directions = [[1,0],[0,1],[1,1],[1,-1]];
+            for (const [dx, dy] of directions) {
+                let count = 1;
+                for (let step = 1; step < 5; step++) {
+                    const nx = x + dx * step, ny = y + dy * step;
+                    if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize || board[ny][nx] !== player) break;
+                    count++;
+                }
+                for (let step = 1; step < 5; step++) {
+                    const nx = x - dx * step, ny = y - dy * step;
+                    if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize || board[ny][nx] !== player) break;
+                    count++;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        function showWinModal(player) {
+            gameOver = true;
+            winTitle.textContent = player === 1 ? '黑方获胜！' : '白方获胜！';
+            winMessage.textContent = player === 1 ? '黑方连成五子，赢得比赛。' : '白方连成五子，赢得比赛。';
+            winPiece.innerHTML = `<div class="winner-piece ${player === 1 ? 'black-piece' : 'white-piece'}"></div>`;
+            winModal.style.display = 'flex';
+        }
+
+        function handleCanvasClick(e) {
+            if (gameOver) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.round((e.clientX - rect.left) / cellSize) - 1;
+            const y = Math.round((e.clientY - rect.top) / cellSize) - 1;
+            if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && board[y][x] === 0) {
+                board[y][x] = currentPlayer;
+                moveHistory.push({x, y, player: currentPlayer});
+                drawPiece(x, y, currentPlayer);
+                if (checkWin(x, y, currentPlayer)) {
+                    showWinModal(currentPlayer);
+                } else {
+                    currentPlayer = currentPlayer === 1 ? 2 : 1;
+                    updateStatus();
+                }
+            }
+        }
+
+        function undoMove() {
+            if (gameOver || moveHistory.length === 0) return;
+            const lastMove = moveHistory.pop();
+            board[lastMove.y][lastMove.x] = 0;
+            currentPlayer = lastMove.player;
+            drawBoard();
+            drawAllPieces();
+            updateStatus();
+        }
+
+        function restartGame() {
+            board = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+            currentPlayer = 1;
+            gameOver = false;
+            moveHistory = [];
+            drawBoard();
+            updateStatus();
+            winModal.style.display = 'none';
+        }
+
+        canvas.addEventListener('click', handleCanvasClick);
+        undoBtn.addEventListener('click', undoMove);
+        restartBtn.addEventListener('click', restartGame);
+        modalRestartBtn.addEventListener('click', restartGame);
+
+        drawBoard();
+        updateStatus();
+    </script>
+</body>
+</html>
